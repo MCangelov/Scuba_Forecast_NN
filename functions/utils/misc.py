@@ -1,3 +1,7 @@
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+import calendar
+
 def remove_months(end_date_str, months_to_remove):
     """
     Removes the specified number of months from the given end date.
