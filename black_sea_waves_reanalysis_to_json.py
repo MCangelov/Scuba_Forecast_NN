@@ -1,94 +1,116 @@
+from functions.utils.misc import remove_months, add_months, beach_coordinates_locator
+from functions.API_preprocessing.wave_feature_output import filter_beach_data
+from functions.API_preprocessing.get_api import call_api
+import pandas as pd
+from dateutil.relativedelta import relativedelta
+from datetime import datetime
 import calendar
 import getpass
-
-import pandas as pd
-
-import sys
-sys.path.append('C:\\Users\\24\\Desktop\\Scraper\\scuba_scrapper\\functions')
-
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-
-from functions.utils.misc import remove_months, add_months, sensor_locator
-from functions.API_preprocessing.wave_feature_output import wave_feature_output
-from functions.API_preprocessing.get_api import get_data
+import os
+project_root = os.path.dirname(os.path.abspath(__file__))
 
 
 USERNAME = input('Enter your username: ')
 PASSWORD = getpass.getpass('Enter your password: ')
-
-# date_start always begin on the first day/00:00:00 of a month and date_end always ends on the last day/23:00:00 of a month.
-YYYY_MM_start = input('Enter the extraction start date (YYYY-MM): ').split('-')
-date_start = f'{YYYY_MM_start[0]}-{YYYY_MM_start[1]}-01 00:00:00'
-
-YYYY_end, MM_end = map(int, input(
+YYYY_MM_datetime_start_date = input(
+    'Enter the extraction start date (YYYY-MM): ').split('-')
+YYYY_datetime_end_date, MM_datetime_end_date = map(int, input(
     'Enter the extraction end date (YYYY-MM): ').split('-'))
-LAST_DAY = calendar.monthrange(YYYY_end, MM_end)[1]
-date_end = f'{YYYY_end}-{MM_end:02d}-{LAST_DAY:02d} 23:00:00'
+OUTPUT_FILENAME = 'black_sea_waves_reanalysis.nc'
+BEACH_INFO = pd.read_csv(os.path.join(
+    project_root, 'csv_data', 'beach_info.csv'), index_col=0)
+
+
+# start_date always begin on the first day/00:00:00 of a month and end_date always ends on the last day/23:00:00 of a month.
+start_date = f'{YYYY_MM_datetime_start_date[0]}-{YYYY_MM_datetime_start_date[1]}-01 00:00:00'
+last_day_of_month = calendar.monthrange(
+    YYYY_datetime_end_date, MM_datetime_end_date)[1]
+end_date = f'{YYYY_datetime_end_date}-{MM_datetime_end_date:02d}-{last_day_of_month:02d} 23:00:00'
 
 # Handle case where the end date is before the start date
-if datetime.strptime(date_start, '%Y-%m-%d %H:%M:%S') > datetime.strptime(date_end, '%Y-%m-%d %H:%M:%S'):
+if datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S') > datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S'):
     raise Exception("The end date must be after the start date.")
-
-OUTPUT_FILENAME = 'black_sea_waves_reanalysis.nc'
 
 
 # There is a limit to the size of the data that can be called, so we limit the data to 1 month.
 # If a bigger range is put in, the data is batched, and time frames are processed separately.
-BATCH_SIZE = None
-START_DATE = datetime.strptime(date_start, '%Y-%m-%d %H:%M:%S')
-END_DATE = datetime.strptime(date_end, '%Y-%m-%d %H:%M:%S')
+total_month_range = None
+datetime_start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+datetime_end_date = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
 
-delta = relativedelta(END_DATE, START_DATE)
-BATCH_SIZE = delta.years * 12 + delta.months
+delta = relativedelta(datetime_end_date, datetime_start_date)
+total_month_range = delta.years * 12 + delta.months
 
-if delta.days > 0 and END_DATE.day < START_DATE.day:  # Leap years and varying month days
-    BATCH_SIZE -= 1
+if delta.days > 0 and datetime_end_date.day < datetime_start_date.day:  # Leap years and varying month days
+    total_month_range -= 1
 
-filename = f'beach_df_{START_DATE.year}_{START_DATE.month}-{END_DATE.year}_{END_DATE.month}.json'
+# Used to specify start/end date for beach data extraction
 
-beach_info = pd.read_csv(
-    'C:/Users/24/Desktop/Scraper/scuba_scrapper/beach_info.csv', index_col=0)
 
-if BATCH_SIZE == 0:
-    bs_df = get_data(USERNAME, PASSWORD, OUTPUT_FILENAME, date_start, date_end)
-    beach_info_sensor = sensor_locator(beach_info, bs_df)
-    result_df = wave_feature_output(beach_info_sensor, bs_df)
+def range_defined_beach_data(start_date, end_date, total_month_range):
 
-    beach_df = pd.concat(result_df, keys=beach_info_sensor['beach_name'])
+    def get_monthly_beach_data(start_date, end_date, beach_coordinates=None):
+        """
+        Fetches and filters beach data for a given date range.
+
+        This function calls an API to get unfiltered beach data for a specified date range. 
+        It then filters this data based on the provided beach coordinates. 
+        If no coordinates are provided, it uses the `beach_coordinates_locator` function 
+        to determine the coordinates.
+
+        Parameters:
+        start_date (str): The start date for fetching the data in 'YYYY-MM-DD' format.
+        end_date (str): The end date for fetching the data in 'YYYY-MM-DD' format.
+        beach_coordinates (tuple, optional): A tuple containing the latitude and longitude of the beach. 
+                                            Defaults to None.
+
+        Returns:
+        tuple: A tuple where the first element is the filtered beach data and the second element 
+            is the beach coordinates used for filtering.
+        """
+        unfiltered_beach_data = call_api(
+            USERNAME, PASSWORD, OUTPUT_FILENAME, start_date, end_date)
+        if beach_coordinates == None:
+            beach_coordinates = beach_coordinates_locator(
+                BEACH_INFO, unfiltered_beach_data)
+        return filter_beach_data(beach_coordinates, unfiltered_beach_data), beach_coordinates
+
+    filtered_monthly_beach_data = []
+
+    if total_month_range == 0:  # Edge case where only one month is processed
+        filtered_monthly_beach_data, beach_coordinates = get_monthly_beach_data(
+            start_date, end_date, beach_coordinates=None)
+    else:
+        # We carry out this trick, in order to account for varying month length and leap years
+        for i in range(total_month_range + 1):
+            if i == 0:
+                # The start_date & end_date are set to the same month
+                end_date = remove_months(end_date, total_month_range)
+                filtered_monthly_beach_data, beach_coordinates = get_monthly_beach_data(
+                    start_date, end_date, beach_coordinates=None)
+            else:
+                # With each iteration, shift start and end by 1 month
+                start_date = add_months(start_date, 1)
+                # The add_months function accounts for the month length variability
+                end_date = add_months(end_date, 1)
+
+                one_month_filtered_beach_data, beach_coordinates = get_monthly_beach_data(
+                    start_date, end_date)
+
+                if len(one_month_filtered_beach_data) != 63:
+                    raise ValueError("Missing beach data")
+
+                filtered_monthly_beach_data = [pd.concat([df1, df2], ignore_index=False)
+                                               for df1, df2 in zip(filtered_monthly_beach_data, one_month_filtered_beach_data)]
+
+    beach_df = pd.concat(filtered_monthly_beach_data,
+                         keys=beach_coordinates['beach_name'])
     beach_df.index.set_names(['beach_name', 'time'], inplace=True)
+    return beach_df
 
 
-else:
-    for i in range(BATCH_SIZE + 1):
-        # For the first iteration, we subtract the end month to make it the same as the start month
-        if i == 0:
-            date_end = remove_months(date_end, BATCH_SIZE)
+temporal_beach_data_df = range_defined_beach_data(
+    start_date, end_date, total_month_range)
 
-            bs_df = get_data(USERNAME, PASSWORD,
-                             OUTPUT_FILENAME, date_start, date_end)
-
-            beach_info_sensor = sensor_locator(beach_info, bs_df)
-
-            result_df = wave_feature_output(beach_info_sensor, bs_df)
-
-        # Each consecutive iteration, shift both months by 1
-        else:
-            date_start = add_months(date_start, 1)
-            date_end = add_months(date_end, 1)
-
-            bs_df = get_data(USERNAME, PASSWORD,
-                             OUTPUT_FILENAME, date_start, date_end)
-
-            single_result_df = wave_feature_output(beach_info_sensor, bs_df)
-
-            # Makes sure all beaches are present
-            if len(single_result_df) != 63:
-                raise ValueError("Missing beach data")
-
-            result_df = [pd.concat([df1, df2], ignore_index=False)
-                         for df1, df2 in zip(result_df, single_result_df)]
-            beach_df = pd.concat(
-                result_df, keys=beach_info_sensor['beach_name'])
-
-beach_df.to_json(filename, orient = 'split')
+filename = f'temporal_beach_data_df_{datetime_start_date.year}_{datetime_start_date.month}-{datetime_end_date.year}_{datetime_end_date.month}.json'
+temporal_beach_data_df.to_json(filename, orient='split')
