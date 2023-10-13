@@ -1,10 +1,15 @@
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from typing import List
 import calendar
+import pandas as pd
+pd.options.mode.chained_assignment = None
 
-def remove_months(end_date_str, months_to_remove):
+
+def remove_months(end_date_str: str, months_to_remove: int) -> str:
     """
-    Removes the specified number of months from the given end date.
+    Removes the specified number of months from the given end date and ensures that
+    the new end date is the last day of the month.
 
     Args:
         end_date_str (str): The end date in the format "%Y-%m-%d %H:%M:%S".
@@ -15,28 +20,31 @@ def remove_months(end_date_str, months_to_remove):
     """
     date_format = "%Y-%m-%d %H:%M:%S"
     end_date = datetime.strptime(end_date_str, date_format)
-
     new_end_date = end_date - relativedelta(months=months_to_remove)
+
+    # Necessary to get the last day of the month, due to it being dynamic.
+    _, last_day_of_month = calendar.monthrange(
+        new_end_date.year, new_end_date.month)
+    new_end_date = new_end_date.replace(day=last_day_of_month)
 
     return new_end_date.strftime(date_format)
 
 
-
-def add_months(start_date_str, months_to_remove):
+def add_months(start_date_str: str, months_to_add: int) -> str:
     """
-    Adds the specified number of months from the given end date.
+    Adds the specified number of months to the given date.
 
     Args:
         start_date_str (str): The start date in the format '%Y-%m-%d %H:%M:%S'.
-        months_to_remove (int): The number of months to add.
+        months_to_add (int): The number of months to add.
 
     Returns:
-        str: The new start date, with the day set to the last day of the month if necessary.
+        str: The new future date.
     """
     date_format = "%Y-%m-%d %H:%M:%S"
     start_date = datetime.strptime(start_date_str, date_format)
 
-    new_start_date = start_date + relativedelta(months=months_to_remove)
+    new_start_date = start_date + relativedelta(months=months_to_add)
 
     # Necessary to get the last day of the month, due to it being dynamic.
     if new_start_date.day != 1:
@@ -48,11 +56,10 @@ def add_months(start_date_str, months_to_remove):
     return new_start_date.strftime(date_format)
 
 
-# Binary search
-def binary_search(arr, target):
+def binary_search(arr: List[int], target: int) -> List[int]:
     """
     Perform binary search on a sorted array to find the target value.
-    
+
     Args:
         arr (list): The sorted array.
         target (int): The target value to search for.
@@ -81,13 +88,13 @@ def binary_search(arr, target):
     return [closest_index, arr[closest_index]]
 
 
-def sensor_locator(beach_info, bs_df):
+def beach_coordinates_locator(beach_info: pd.DataFrame, beach_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Assigns lat_sensor and lon_sensor values to each row in beach_info based on binary search in bs_df.
+    Assigns lat_sensor and lon_sensor values to each row in beach_info based on binary search in beach_df.
 
     Args:
         beach_info (pandas.DataFrame): DataFrame containing beach information.
-        bs_df (pandas.DataFrame): DataFrame for binary search.
+        beach_df (pandas.DataFrame): DataFrame for binary search.
 
     Returns:
         pandas.DataFrame: Updated beach_info DataFrame with lat_sensor and lon_sensor values.
@@ -96,10 +103,11 @@ def sensor_locator(beach_info, bs_df):
     beach_info['lon_sensor'] = None
 
     for i, lat_val in enumerate(beach_info['latitude']):
-        c = binary_search(bs_df.index.levels[1], lat_val)
+        c = binary_search(beach_df.index.levels[1], lat_val)
         beach_info['lat_sensor'][i] = c
 
     for i, lon_val in enumerate(beach_info['longitude']):
-        d = binary_search(bs_df.index.levels[2], lon_val)
+        d = binary_search(beach_df.index.levels[2], lon_val)
+
         beach_info['lon_sensor'][i] = d
     return beach_info
