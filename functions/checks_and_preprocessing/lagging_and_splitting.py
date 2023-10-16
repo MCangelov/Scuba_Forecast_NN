@@ -52,13 +52,13 @@ def split_dataframe(dataframe: DataFrame, train_ratio: float = 0.7, valid_ratio:
     return train, valid, test, test_index
 
 
-def sliding_window(dataset, seq_size=10):
+def sliding_window(dataset: np.ndarray, window: int = 10) -> Tuple[np.ndarray, np.ndarray]:
     """
     Transforms a dataset into overlapping sequences (or "sliding windows") of a specific size.
 
     Parameters:
     dataset (ndarray): The input dataset as a NumPy array.
-    seq_size (int): The size of the sequences (or "windows").
+    window (int): The size of the sequences (or "windows").
 
     Returns:
     Tuple[ndarray, ndarray]: A tuple containing two NumPy arrays. The first array contains the sequences of data, and the second array contains the corresponding targets (the next step after each sequence).
@@ -66,10 +66,10 @@ def sliding_window(dataset, seq_size=10):
     x = []
     y = []
 
-    for i in range(len(dataset) - seq_size - 1):
-        window = dataset[i:(i+seq_size), :]
+    for i in range(len(dataset) - window - 1):
+        window = dataset[i:(i+window), :]
         x.append(window)
-        y.append(dataset[i+seq_size, :])
+        y.append(dataset[i+window, :])
 
     x = np.array(x)
     y = np.array(y)
