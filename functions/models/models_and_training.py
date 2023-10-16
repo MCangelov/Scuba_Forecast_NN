@@ -3,7 +3,7 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers import LSTM, Dropout, Dense
 from keras.metrics import RootMeanSquaredError, MeanAbsoluteError
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, History
 from keras import Model
 
 
@@ -38,7 +38,7 @@ def train_model(model: Model,
                 valX: np.ndarray, valY: np.ndarray,
                 epochs: int = 1000,
                 patience: int = 400,
-                batch_size: int = 16) -> Model:
+                batch_size: int = 16) -> History:
     """
     Trains the provided model using the given training and validation data.
 
@@ -53,7 +53,7 @@ def train_model(model: Model,
     batch_size (int, optional): The batch size for training. Defaults to 16.
 
     Returns:
-    Tuple[Model, dict]: The trained model and the training history.
+    History: The training history.
     """
 
     model.compile(optimizer='adam', loss='mean_squared_error',
