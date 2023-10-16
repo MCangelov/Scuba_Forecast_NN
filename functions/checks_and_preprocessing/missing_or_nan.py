@@ -1,6 +1,7 @@
 import pandas as pd
 
-def check_missing_or_nan(single_beach_df, beach_name_sql_table):
+
+def check_missing_or_nan(single_beach_df, beach_name_sql_table, DATA_STARTDATE="1979-01-01", DATA_ENDDATE="2021-12-31"):
     """
     Analyze a DataFrame for missing hours and NaN values.
 
@@ -11,8 +12,14 @@ def check_missing_or_nan(single_beach_df, beach_name_sql_table):
 
     beach_name_sql_table : str
         The name of the selected table.
+
+    DATA_STARTDATE : str
+        The start date of the dataset
+
+    DATA_ENDDATE : str
+        The end date of the dataset
     """
-    index_range = pd.date_range("1979-01-01", "2021-12-31", freq='H')
+    index_range = pd.date_range(DATA_STARTDATE, DATA_ENDDATE, freq='H')
     missing_hours = index_range.difference(single_beach_df.index)
 
     if missing_hours.empty:
