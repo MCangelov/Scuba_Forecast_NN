@@ -1,16 +1,16 @@
+from typing import Tuple, Dict
+from scipy.stats import shapiro, normaltest, anderson, kstest
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.stattools import adfuller, kpss
+from statsmodels.tsa.filters.hp_filter import hpfilter
+from matplotlib import pyplot as plt
+import numpy as np
+import pandas as pd
 import warnings
 warnings.filterwarnings("ignore")
 
-import numpy as np
 
-from matplotlib import pyplot as plt
-from statsmodels.tsa.stattools import adfuller, kpss
-from statsmodels.tsa.seasonal import seasonal_decompose
-
-from scipy.stats import shapiro, normaltest, anderson, kstest
-
-
-def kpss_adf_stationarity(df):
+def kpss_adf_stationarity(df: pd.DataFrame) -> Tuple[str, str]:
     """
     Check the stationarity of a time series DataFrame.
 
@@ -41,14 +41,11 @@ def kpss_adf_stationarity(df):
     if adf_pv < 0.05:
         adfh = 'ADF - Stationary'
 
+    return (kpssh, adfh)
 
 
-    
-    return (kpssh, adfh)    
-
-
-#Imply a choice for method selection, or always include all
-def plot_comparison(df, plot_type = 'line'):
+# Imply a choice for method selection, or always include all
+def plot_comparison(df: pd.DataFrame, plot_type: str = 'line') -> None:
     """
     Plot a comparison from the output of kpss_adf_stationarity.
     Methods include orders of differencing
@@ -72,39 +69,33 @@ def plot_comparison(df, plot_type = 'line'):
     subtract_rolling_mean = df - rolling
     log_transform = np.log(df)
 
-    #test for seasonal decomposition, to see if its additive or multiplicative
-    #If the tests show non-stationarity, then we can assume a trend/seasonality. 
-    #If that is the case, we can some or all of these methods.
     decomp = seasonal_decompose(df)
     sd_detrend = decomp.observed - decomp.trend
-    cyclic, trend = hpfilter(df)
+    # cyclic, trend = hpfilter(df)
 
     methods = [first_order_diff, second_order_diff,
-           subtract_rolling_mean, log_transform,
-           sd_detrend, cyclic]
-    
+               subtract_rolling_mean, log_transform,
+               sd_detrend]  # , cyclic]
 
     n = len(methods) // 2
-    fig, ax = plt.subplots(n, 2, sharex = True, figsize = (20, 10))
-    
+    _, ax = plt.subplots(n, 2, sharex=True, figsize=(20, 10))
+
     for i, method in enumerate(methods):
-        method.dropna(inplace = True)
+        method.dropna(inplace=True)
         name = [n for n in globals() if globals()[n] is method]
         v, r = i // 2, i % 2
         kpss_s, adf_s = kpss_adf_stationarity(method)
-        
+
         method.plot(kind=plot_type,
                     ax=ax[v, r],
                     legend=False,
                     title=f'{name[0]} --> KPSS: {kpss_s}, ADF: {adf_s}')
-        
+
         ax[v, r].title.set_size(20)
-        method.rolling(52).mean().plot(ax = ax[v, r], legend = False)
+        method.rolling(52).mean().plot(ax=ax[v, r], legend=False)
 
 
-
-
-def normality_testing(df, p_level=0.05):
+def normality_testing(df: pd.DataFrame, p_level: float = 0.05) -> Dict[str, str]:
     """
     Perform normality tests on a DataFrame.
 
@@ -126,10 +117,10 @@ def normality_testing(df, p_level=0.05):
     dict
         A dictionary containing the results of each normality test
     """
-    shapiro_stat, shapiro_pval = shapiro(df)
-    normaltest_stat, normaltest_pval = normaltest(df)
+    _, shapiro_pval = shapiro(df)
+    _, normaltest_pval = normaltest(df)
     anderson_stat = anderson(df, dist='norm')
-    kstest_stat, kstest_pval = kstest(df, 'norm')
+    _, kstest_pval = kstest(df, 'norm')
 
     results = {
         'Shapiro-Wilk': 'Pass normality' if shapiro_pval > p_level else 'Non-normality',
