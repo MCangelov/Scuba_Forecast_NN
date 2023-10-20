@@ -7,26 +7,34 @@ from keras.callbacks import EarlyStopping, History
 from keras import Model
 
 
-def create_single_LTSM(units: int, window: int, features: int, dropout: float = 0.2) -> Model:
+def create_multiple_LSTM(n_layers: int, units: int, window: int, features: int, dropout: float = 0.0) -> Model:
     """
-    Creates a single layer LSTM model.
+    (Optionally) Creates a multi-layer LSTM model.
 
     Parameters:
+    n_layers (int): The number of LSTM layers.
     units (int): The number of LSTM units.
     window (int): The length of the input sequence.
     features (int): The number of input features.
-    dropout (float, optional): The dropout rate. Defaults to 0.2.
+    dropout (float, optional): The dropout rate. Defaults to 0.0.
 
     Returns:
     Model: A compiled Keras model.
     """
 
     model = Sequential()
-    model.add(LSTM(units=units, activation='relu',
-                   input_shape=(window, features)))
+    model.add(LSTM(units=units, return_sequences=True if n_layers > 1 else False,
+                   activation='relu', input_shape=(window, features)))
     model.add(Dropout(dropout))
+
+    for i in range(n_layers - 1):
+        model.add(LSTM(units=units, return_sequences=True if i < n_layers - 2 else False,
+                       activation='relu'))
+        model.add(Dropout(dropout))
+
     model.add(Dense(32, activation='relu'))
-    model.add(Dense(19))
+    model.add(Dense(features))
+
     model.compile(loss='mean_squared_error', optimizer='adam', metrics=[
                   'mean_absolute_error', 'root_mean_squared_error'])
 
@@ -36,9 +44,10 @@ def create_single_LTSM(units: int, window: int, features: int, dropout: float = 
 def train_model(model: Model,
                 trainX: np.ndarray, trainY: np.ndarray,
                 valX: np.ndarray, valY: np.ndarray,
-                epochs: int = 1000,
-                patience: int = 400,
-                batch_size: int = 16) -> History:
+                epochs: int = 500,
+                patience: int = 50,
+                batch_size: int = 16,
+                verbose: int = 1) -> History:
     """
     Trains the provided model using the given training and validation data.
 
@@ -48,9 +57,10 @@ def train_model(model: Model,
     trainY (np.ndarray): The training labels.
     valX (np.ndarray): The validation data.
     valY (np.ndarray): The validation labels.
-    epochs (int, optional): The number of epochs to train for. Defaults to 1000.
-    patience (int, optional): The number of epochs to wait for improvement before stopping. Defaults to 400.
-    batch_size (int, optional): The batch size for training. Defaults to 16.
+    epochs (int, Optional): The number of epochs to train for. Defaults to 500.
+    patience (int, Optional): The number of epochs to wait for improvement before stopping. Defaults to 50.
+    batch_size (int, Optional): The batch size for training. Defaults to 16.
+    verbose (int, Optional): The level of verbosity. Defaults to 1.
 
     Returns:
     History: The training history.
@@ -65,6 +75,6 @@ def train_model(model: Model,
     history = model.fit(trainX, trainY, validation_data=(valX, valY),
                         shuffle=False, epochs=epochs,
                         batch_size=batch_size,
-                        verbose=2, callbacks=[early_stopping])
+                        verbose=verbose, callbacks=[early_stopping])
 
     return history
