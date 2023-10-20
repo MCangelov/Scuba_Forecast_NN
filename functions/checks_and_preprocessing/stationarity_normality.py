@@ -3,7 +3,6 @@ from scipy.stats import shapiro, normaltest, anderson, kstest
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import adfuller, kpss
 from statsmodels.tsa.filters.hp_filter import hpfilter
-from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 import warnings
@@ -45,54 +44,39 @@ def kpss_adf_stationarity(df: pd.DataFrame) -> Tuple[str, str]:
 
 
 # Imply a choice for method selection, or always include all
-def plot_comparison(df: pd.DataFrame, plot_type: str = 'line') -> None:
+def check_stationarity(df: pd.DataFrame, non_stationary: dict) -> None:
     """
-    Plot a comparison from the output of kpss_adf_stationarity.
-    Methods include orders of differencing
+    Check which differencing method makes the series stationary.
 
     Parameters:
     -----------
     df : pandas.DataFrame
         The time series DataFrame to be analyzed.
-
-    plot_type : str, optional 
-        Type of plot to be used ('line' by default).
+    non_stationary : dict
+        A dictionary of non-stationary columns.
 
     Returns:
-
+    --------
+    None
     """
 
-    first_order_diff = df.diff().dropna()
-    second_order_diff = df.diff(52).diff().dropna()
-    rolling = df.rolling(window=52).mean()
+    methods = {
+        'first_order_diff': df.diff(),
+        'second_order_diff': df.diff(52),
+        'subtract_rolling_mean': df - df.rolling(window=52).mean(),
+        'log_transform': np.log(df),
+        'sd_detrend': seasonal_decompose(df).observed - seasonal_decompose(df).trend,
+        'cyclic': hpfilter(df)[0]
+    }
 
-    subtract_rolling_mean = df - rolling
-    log_transform = np.log(df)
+    for column in non_stationary.keys():
+        print(f"\nColumn: {column}")
+        for name, method in methods.items():
+            method = method[column].dropna()
+            kpss_s, adf_s = kpss_adf_stationarity(method)
 
-    decomp = seasonal_decompose(df)
-    sd_detrend = decomp.observed - decomp.trend
-    # cyclic, trend = hpfilter(df)
-
-    methods = [first_order_diff, second_order_diff,
-               subtract_rolling_mean, log_transform,
-               sd_detrend]  # , cyclic]
-
-    n = len(methods) // 2
-    _, ax = plt.subplots(n, 2, sharex=True, figsize=(20, 10))
-
-    for i, method in enumerate(methods):
-        method.dropna(inplace=True)
-        name = [n for n in globals() if globals()[n] is method]
-        v, r = i // 2, i % 2
-        kpss_s, adf_s = kpss_adf_stationarity(method)
-
-        method.plot(kind=plot_type,
-                    ax=ax[v, r],
-                    legend=False,
-                    title=f'{name[0]} --> KPSS: {kpss_s}, ADF: {adf_s}')
-
-        ax[v, r].title.set_size(20)
-        method.rolling(52).mean().plot(ax=ax[v, r], legend=False)
+            if kpss_s == 'KPSS - Stationary' and adf_s == 'ADF - Stationary':
+                print(f'{name} --> KPSS: {kpss_s}, ADF: {adf_s}')
 
 
 def normality_testing(df: pd.DataFrame, p_level: float = 0.05) -> Dict[str, str]:
