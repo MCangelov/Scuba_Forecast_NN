@@ -4,6 +4,7 @@ from functions.API_preprocessing.get_api import call_api
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from datetime import datetime
+from typing import Tuple, Optional
 import calendar
 import getpass
 import os
@@ -21,7 +22,7 @@ BEACH_INFO = pd.read_csv(os.path.join(
     project_root, 'csv_data', 'beach_info.csv'), index_col=0)
 
 
-# start_date always begin on the first day/00:00:00 of a month and end_date always ends on the last day/23:00:00 of a month.
+# Start_date always begin on the first day/00:00:00 of a month and end_date always ends on the last day/23:00:00 of a month.
 start_date = f'{YYYY_MM_datetime_start_date[0]}-{YYYY_MM_datetime_start_date[1]}-01 00:00:00'
 last_day_of_month = calendar.monthrange(
     YYYY_datetime_end_date, MM_datetime_end_date)[1]
@@ -32,8 +33,8 @@ if datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S') > datetime.strptime(end_da
     raise Exception("The end date must be after the start date.")
 
 
-# There is a limit to the size of the data that can be called, so we limit the data to 1 month.
-# If a bigger range is put in, the data is batched, and time frames are processed separately.
+# There is a limit to the size of the data that can be called (1gb), so we limit the data to 1 month.
+# If a bigger range (hance bigger size) is put in, the data is batched, and time frames are processed separately.
 total_month_range = None
 datetime_start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
 datetime_end_date = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
@@ -44,12 +45,11 @@ total_month_range = delta.years * 12 + delta.months
 if delta.days > 0 and datetime_end_date.day < datetime_start_date.day:  # Leap years and varying month days
     total_month_range -= 1
 
+
 # Used to specify start/end date for beach data extraction
+def range_defined_beach_data(start_date: str, end_date: str, total_month_range: int) -> pd.DataFrame:
 
-
-def range_defined_beach_data(start_date, end_date, total_month_range):
-
-    def get_monthly_beach_data(start_date, end_date, beach_coordinates=None):
+    def get_monthly_beach_data(start_date: str, end_date: str, beach_coordinates: Optional[pd.DataFrame] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Fetches and filters beach data for a given date range.
 
@@ -68,6 +68,7 @@ def range_defined_beach_data(start_date, end_date, total_month_range):
         tuple: A tuple where the first element is the filtered beach data and the second element 
             is the beach coordinates used for filtering.
         """
+
         unfiltered_beach_data = call_api(
             USERNAME, PASSWORD, OUTPUT_FILENAME, start_date, end_date)
         if beach_coordinates == None:
@@ -81,7 +82,7 @@ def range_defined_beach_data(start_date, end_date, total_month_range):
         filtered_monthly_beach_data, beach_coordinates = get_monthly_beach_data(
             start_date, end_date, beach_coordinates=None)
     else:
-        # We carry out this trick, in order to account for varying month length and leap years
+        # We carry out this trick, in order to account for varying month length (i.e. 30 or 31 days) and leap years
         for i in range(total_month_range + 1):
             if i == 0:
                 # The start_date & end_date are set to the same month
@@ -100,17 +101,19 @@ def range_defined_beach_data(start_date, end_date, total_month_range):
                 if len(one_month_filtered_beach_data) != 63:
                     raise ValueError("Missing beach data")
 
-                filtered_monthly_beach_data = [pd.concat([df1, df2], ignore_index=False)
+                filtered_monthly_beach_data = [pd.concat([df1, df2], ignore_index=False)  # type: ignore
                                                for df1, df2 in zip(filtered_monthly_beach_data, one_month_filtered_beach_data)]
 
-    beach_df = pd.concat(filtered_monthly_beach_data,
-                         keys=beach_coordinates['beach_name'])
+    beach_df = pd.concat(filtered_monthly_beach_data,  # type: ignore
+                         keys=beach_coordinates['beach_name'])  # type: ignore
     beach_df.index.set_names(['beach_name', 'time'], inplace=True)
     return beach_df
 
 
+# Data for the specified time range
 temporal_beach_data_df = range_defined_beach_data(
     start_date, end_date, total_month_range)
+
 
 filename = f'temporal_beach_data_df_{datetime_start_date.year}_{datetime_start_date.month}-{datetime_end_date.year}_{datetime_end_date.month}.json'
 temporal_beach_data_df.to_json(filename, orient='split')
