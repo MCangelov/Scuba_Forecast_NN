@@ -99,17 +99,17 @@ beach_dict = {'beach_name': beach_list}
 title_divs = driver.find_elements(By.CSS_SELECTOR, "div.title")
 
 # Gathering the URLs of every beach
-utl_storage = []
+url_storage = []
 for i, title_div in enumerate(title_divs):
     try:
         inner_anchor = title_div.find_element(By.CSS_SELECTOR, "a")
         href_value = inner_anchor.get_attribute("href")
-        utl_storage.append(href_value)
+        url_storage.append(href_value)
 
     except NoSuchElementException:
         break
 
-beach_dict['urls'] = utl_storage
+beach_dict['urls'] = url_storage
 
 latitude_container = []
 longitude_container = []
@@ -118,6 +118,7 @@ longitude_container = []
 try:
     for name_link in beach_dict['urls']:
         try:
+            # Have to redo for every new link we visit
             navigate_to_url(driver, name_link)
             scroll_to_bottom(driver)
             remove_elements(driver, CSS_ELEMENTS)
