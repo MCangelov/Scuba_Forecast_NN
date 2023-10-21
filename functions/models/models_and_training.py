@@ -75,6 +75,6 @@ def train_model(model: Model,
     history = model.fit(trainX, trainY, validation_data=(valX, valY),
                         shuffle=False, epochs=epochs,
                         batch_size=batch_size,
-                        verbose=verbose, callbacks=[early_stopping])
+                        verbose=verbose, callbacks=[early_stopping])  # type: ignore
 
     return history
