@@ -1,5 +1,5 @@
 from pandas import DataFrame
-from typing import Tuple
+from typing import Tuple, Union
 import numpy as np
 import pandas as pd
 
@@ -49,10 +49,10 @@ def split_dataframe(dataframe: DataFrame, train_ratio: float = 0.7, valid_ratio:
 
     test_index = dataframe.index[train_length + valid_length:]
 
-    return train, valid, test, test_index
+    return train, valid, test, test_index  # type: ignore
 
 
-def sliding_window(dataset: np.ndarray, window_size: int = 10) -> Tuple[np.ndarray, np.ndarray]:
+def sliding_window(dataset: np.ndarray, window_size: int) -> Union[Tuple[np.ndarray, np.ndarray], str]:
     """
     Transforms a dataset into overlapping sequences (or "sliding windows") of a specific size.
 
@@ -63,6 +63,10 @@ def sliding_window(dataset: np.ndarray, window_size: int = 10) -> Tuple[np.ndarr
     Returns:
     Tuple[ndarray, ndarray]: A tuple containing two NumPy arrays. The first array contains the sequences of data, and the second array contains the corresponding targets (the next step after each sequence).
     """
+
+    if window_size <= 0:
+        return "Error: window_size should be greater than 0."
+
     x = []
     y = []
 
