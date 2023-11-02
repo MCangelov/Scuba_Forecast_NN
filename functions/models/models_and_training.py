@@ -32,10 +32,10 @@ def create_multiple_LSTM(n_layers: int, units: int, window: int, features: int, 
                        activation='relu'))
         model.add(Dropout(dropout))
 
-    model.add(Dense(32, activation='relu'))
+    model.add(Dense(361, activation='relu'))
     model.add(Dense(features))
 
-    model.compile(loss='mean_squared_error', optimizer='adam', metrics=[
+    model.compile(loss='root_mean_squared_error', optimizer='adam', metrics=[
                   'mean_absolute_error', 'root_mean_squared_error'])
 
     return model
