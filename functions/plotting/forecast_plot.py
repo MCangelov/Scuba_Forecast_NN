@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+import plotly.graph_objects as go
 
 
 def plot_forecast(best_model: dict) -> None:
@@ -15,7 +14,7 @@ def plot_forecast(best_model: dict) -> None:
     None
     """
 
-    _, history = list(best_model.items())[0]
+    history = list(best_model.values())[0]['history']
 
     _, ax = plt.subplots()
 
@@ -38,56 +37,72 @@ def plot_forecast(best_model: dict) -> None:
     plt.show()
 
 
-def plot_actual_vs_predicted(best_model: dict, X: np.ndarray, Y: np.ndarray, scaler: MinMaxScaler or StandardScaler, column_names: list) -> None:
+def plot_metrics(best_model: dict, metric: str) -> None:
     """
-    Plots the actual and predicted values for each feature in the dataset.
+    Plots the metrics and validation metrics by epoch for the best model.
 
     Parameters:
     best_model (dict): The best model and its history returned by get_best_model.
-    X (np.ndarray): The data (either training or validation).
-    Y (np.ndarray): The labels (either training or validation).
-    scaler (MinMaxScaler or StandardScaler): The scaler used to scale the data.
-    column_names (list): The names of the columns (features).
+    metric (str): The name of the metric to plot.
 
     Returns:
     None
     """
 
-    # Extract the model name and history from the best_model dictionary
-    model_name, history = list(best_model.items())[0]
+    history = list(best_model.values())[0]['history']
 
-    # Get the predictions on the data
-    Predict = history.model.predict(X)
+    _, ax = plt.subplots()
 
-    # Reverse the scaling
-    Y = scaler.inverse_transform(Y)
-    Predict = scaler.inverse_transform(Predict)
+    pd.Series(history.history[metric]).plot(
+        style='-', color='blue',
+        title=f'{metric} by Epoch',
+        ax=ax, label=metric
+    )
 
-    num_columns = Y.shape[1]
+    pd.Series(history.history[f'val_{metric}']).plot(
+        style='-', color='orange',
+        ax=ax, label=f'val_{metric}'
+    )
 
-    # Create subplots for each column
-    fig, axes = plt.subplots(num_columns, 1, figsize=(
-        15, 5*num_columns), sharex=True)
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel(metric.capitalize())
 
-    # Loop through each column and plot the actual vs. predicted values
-    for col in range(num_columns):
-        actual = Y[:, col]
-        predicted = Predict[:, col]
+    ax.legend()
 
-        # Plot actual values in blue
-        axes[col].plot(actual, label='Actual', color='blue')
-
-        # Plot predicted values in orange
-        axes[col].plot(predicted, label='Predicted', color='orange')
-
-        # Add labels and legends
-        axes[col].set_title(column_names[col])  # Set title to column name
-        axes[col].set_xlabel('Sample')
-        axes[col].set_ylabel('Value')
-        axes[col].legend()
-
-    # Adjust layout for better readability
-    plt.tight_layout()
-
-    # Show the plot
     plt.show()
+
+
+def plot_predictions(original_data, predicted_data, column_names):
+    """
+    Plots the validation and predicted values for each feature.
+
+    Parameters:
+    valid_scaled (ndarray): The scaled validation data.
+    persistance_valid_predictions (ndarray): The predicted values.
+    column_names (List[str]): The names of the features.
+    """
+
+    for i in range(original_data.shape[1]):
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            y=original_data[:, i],
+            mode='lines',
+            name='Validation',
+            line=dict(color='orange')
+        ))
+
+        fig.add_trace(go.Scatter(
+            y=predicted_data[:, i],
+            mode='lines',
+            name='Predicted',
+            line=dict(color='magenta', dash='dash')
+        ))
+
+        fig.update_layout(
+            title=f'{column_names[i]}',
+            xaxis_title='Time Steps',
+            yaxis_title='Value'
+        )
+
+        fig.show()
