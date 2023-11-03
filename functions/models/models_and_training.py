@@ -1,9 +1,10 @@
 import numpy as np
+import time
 
 from keras.models import Sequential
 from keras.layers import LSTM, Dropout, Dense
 from keras.metrics import RootMeanSquaredError, MeanAbsoluteError
-from keras.callbacks import EarlyStopping, History
+from keras.callbacks import EarlyStopping, History, TensorBoard
 from keras import Model, backend as K
 from typing import Dict, Any
 
@@ -110,10 +111,14 @@ def train_model(model: Model,
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=patience,
                                    verbose=1, mode='auto', restore_best_weights=True)
 
+    # TensorBoard callback
+    log_dir = "logs/fit/" + time.strftime("%Y%m%d-%H%M%S")
+    tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
+
     history = model.fit(trainX, trainY, validation_data=(valX, valY),
                         shuffle=False, epochs=epochs,
                         batch_size=batch_size,
-                        verbose=verbose, callbacks=[early_stopping])  # type: ignore
+                        verbose=verbose, callbacks=[early_stopping, tensorboard_callback])  # type: ignore
 
     return history
 
