@@ -86,7 +86,8 @@ def train_model(model: Model,
                 epochs: int = 500,
                 patience: int = 5,
                 batch_size: int = 16,
-                verbose: int = 1) -> History:
+                verbose: int = 1,
+                use_tensorboard: bool = False) -> History:
     """
     Trains the provided model using the given training and validation data.
 
@@ -100,6 +101,7 @@ def train_model(model: Model,
     patience (int, Optional): The number of epochs to wait for improvement before stopping. Defaults to 5.
     batch_size (int, Optional): The batch size for training. Defaults to 16.
     verbose (int, Optional): The level of verbosity. Defaults to 1.
+    use_tensorboard (bool, Optional): Whether to use TensorBoard callback. Defaults to False.
 
     Returns:
     History: The training history.
@@ -111,14 +113,18 @@ def train_model(model: Model,
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=patience,
                                    verbose=1, mode='auto', restore_best_weights=True)
 
-    # TensorBoard callback
-    log_dir = "logs/fit/" + time.strftime("%Y%m%d-%H%M%S")
-    tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
+    callbacks = [early_stopping]
+
+    if use_tensorboard:
+        # TensorBoard callback
+        log_dir = "logs/fit/" + time.strftime("%Y%m%d-%H%M%S")
+        tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
+        callbacks.append(tensorboard_callback)  # type: ignore
 
     history = model.fit(trainX, trainY, validation_data=(valX, valY),
                         shuffle=False, epochs=epochs,
                         batch_size=batch_size,
-                        verbose=verbose, callbacks=[early_stopping, tensorboard_callback])  # type: ignore
+                        verbose=verbose, callbacks=callbacks)  # type: ignore
 
     return history
 
