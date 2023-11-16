@@ -34,7 +34,10 @@ def get_beach_data(database_connector: str) -> Tuple[pd.DataFrame, str]:
         Tuple[pd.DataFrame, str]: A tuple containing a DataFrame with the beach data and the name of the beach.
     """
     beaches_lat_lon_info = pd.read_csv('csv_data/beach_info.csv', index_col=0)
-    while True:
+    max_attempts = 3
+    attempts = 0
+
+    while attempts < max_attempts:
         try:
             index = int(input("Enter the index of the beach (0 to {}): ".format(
                 len(beaches_lat_lon_info) - 1)))
@@ -44,7 +47,11 @@ def get_beach_data(database_connector: str) -> Tuple[pd.DataFrame, str]:
             print(beach_name_sql_table)
             break
         except (ValueError, IndexError):
+            attempts += 1
             print("Invalid input. Please enter a valid index.")
+            if attempts == max_attempts:
+                print("Maximum number of attempts reached. Exiting function.")
+                return None, None
 
     engine = create_engine(database_connector)
     single_beach_data = pd.read_sql_table(

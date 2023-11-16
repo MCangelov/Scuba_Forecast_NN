@@ -1,15 +1,14 @@
 import numpy as np
 import time
+from typing import Dict, Any
 
-from keras.models import Sequential
-from keras.layers import LSTM, Dropout, Dense
-from keras.metrics import RootMeanSquaredError, MeanAbsoluteError
-from keras.callbacks import EarlyStopping, History, TensorBoard
+from keras.callbacks import EarlyStopping, History, TensorBoard, ReduceLROnPlateau
+from functions.models.lstm_model import create_multiple_LSTM
 from keras import Model, backend as K
 from typing import Dict, Any
 
 
-def generate_models(layers: list, units: list, window: int, features: int, dropout: list) -> dict:
+def generate_models(layers: list, units: list, window: int, features: int, dropout: list, use_attention: bool = False) -> dict:
     """
     This function generates a dictionary of LSTM models with different configurations.
 
@@ -25,7 +24,6 @@ def generate_models(layers: list, units: list, window: int, features: int, dropo
     """
 
     models = {}
-
     for n_layers in layers:
         for n_units in units:
             for drop in dropout:
@@ -33,7 +31,7 @@ def generate_models(layers: list, units: list, window: int, features: int, dropo
 
                 model_name = f'{n_layers} layers, {n_units} units, dropout {drop}'
                 model = create_multiple_LSTM(
-                    n_layers=n_layers, units=n_units, window=window, features=features, dropout=drop)
+                    n_layers=n_layers, units=n_units, window=window, features=features, dropout=drop, use_attention=use_attention)
                 models[model_name] = {
                     'model': model,
                     'history': None
@@ -46,46 +44,12 @@ def generate_models(layers: list, units: list, window: int, features: int, dropo
     return models
 
 
-def create_multiple_LSTM(n_layers: int, units: int, window: int, features: int, dropout: float = 0.0) -> Model:
-    """
-    (Optionally) Creates a multi-layer LSTM model.
-
-    Parameters:
-    n_layers (int): The number of LSTM layers.
-    units (int): The number of LSTM units.
-    window (int): The length of the input sequence.
-    features (int): The number of input features.
-    dropout (float, optional): The dropout rate. Defaults to 0.0.
-
-    Returns:
-    Model: A compiled Keras model.
-    """
-
-    model = Sequential()
-    model.add(LSTM(units=units, return_sequences=True if n_layers > 1 else False,
-                   activation='relu', input_shape=(window, features)))
-    model.add(Dropout(dropout))
-
-    for i in range(n_layers - 1):
-        model.add(LSTM(units=units, return_sequences=True if i < n_layers - 2 else False,
-                       activation='relu'))
-        model.add(Dropout(dropout))
-
-    model.add(Dense(361, activation='relu'))
-    model.add(Dense(features))
-
-    model.compile(loss='root_mean_squared_error', optimizer='adam', metrics=[
-                  'mean_absolute_error', 'root_mean_squared_error'])
-
-    return model
-
-
 def train_model(model: Model,
                 trainX: np.ndarray, trainY: np.ndarray,
                 valX: np.ndarray, valY: np.ndarray,
                 epochs: int = 500,
                 patience: int = 5,
-                batch_size: int = 16,
+                batch_size: int = 32,
                 verbose: int = 1,
                 use_tensorboard: bool = False) -> History:
     """
@@ -98,8 +62,8 @@ def train_model(model: Model,
     valX (np.ndarray): The validation data.
     valY (np.ndarray): The validation labels.
     epochs (int, Optional): The number of epochs to train for. Defaults to 500.
-    patience (int, Optional): The number of epochs to wait for improvement before stopping. Defaults to 5.
-    batch_size (int, Optional): The batch size for training. Defaults to 16.
+    patience (int, Optional): The number of epochs to wait for improvement before stopping. Defaults to 6.
+    batch_size (int, Optional): The batch size for training. Defaults to 32.
     verbose (int, Optional): The level of verbosity. Defaults to 1.
     use_tensorboard (bool, Optional): Whether to use TensorBoard callback. Defaults to False.
 
@@ -107,13 +71,13 @@ def train_model(model: Model,
     History: The training history.
     """
 
-    model.compile(optimizer='adam', loss='mean_squared_error',
-                  metrics=[RootMeanSquaredError(), MeanAbsoluteError()])
-
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=patience,
                                    verbose=1, mode='auto', restore_best_weights=True)
 
     callbacks = [early_stopping]
+    reduce_lr = ReduceLROnPlateau(
+        monitor='val_loss', factor=0.1, patience=10, min_lr=0.00001)  # type: ignore
+    callbacks.append(reduce_lr)  # type: ignore
 
     if use_tensorboard:
         # TensorBoard callback

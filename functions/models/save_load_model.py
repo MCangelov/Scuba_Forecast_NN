@@ -33,18 +33,13 @@ def save_models(models: Dict[str, Dict[str, Any]], save_dir: str) -> None:
     print(f'Models saved to {save_dir}')
 
 
-def load_models(load_dir: str) -> Dict[str, Dict[str, Any]]:
+def load_models(load_dir: str) -> None:
     """
     Load Keras models' weights, training histories, and architectures from a local directory and print the best values of the metrics.
 
     Parameters:
     load_dir (str): The directory to load the model files from.
-
-    Returns:
-    Dict[str, Dict[str, Any]]: A dictionary containing the loaded Keras models and their training histories.
     """
-    models = {}
-
     # Get a list of all model names in the directory
     model_names = [os.path.basename(name).replace('_architecture.json', '')
                    for name in glob.glob(os.path.join(load_dir, '*_architecture.json'))]
@@ -63,8 +58,6 @@ def load_models(load_dir: str) -> Dict[str, Dict[str, Any]]:
         with open(os.path.join(load_dir, f'{model_name}_history.pkl'), 'rb') as f:
             history = pickle.load(f)
 
-        models[model_name] = {'model': model, 'history': history}
-
         dropout_str = model_name.split(', dropout ')[-1]
         dropout = float(dropout_str)
         model_name = model_name.replace(', dropout ' + dropout_str, '')
@@ -74,5 +67,3 @@ def load_models(load_dir: str) -> Dict[str, Dict[str, Any]]:
         val_mae = round(history['val_mean_absolute_error'][-1], 5)
         print(
             f"{model_name:<20} {dropout:<10} {rmse:<10} {mae:<10} {val_rmse:<10} {val_mae:<10}")
-
-    return models
